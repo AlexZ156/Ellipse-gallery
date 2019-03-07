@@ -45,7 +45,19 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const gallery of Array.from(galleries)) {
     new EllipseGallery({
       gallery,
-      slidesData: galleryData
+      slidesData: galleryData,
+      beforeNextSlide(currIndex, prevIndex) {
+
+      },
+      beforePrevSlide(currIndex, prevIndex) {
+
+      },
+      beforeGoToSlide(currIndex, prevIndex) {
+
+      },
+      slideEnd() {
+
+      }
     });
   }
 });
@@ -59,12 +71,16 @@ class EllipseGallery {
     prevBtn: '.prev',
     lastSlideScale: 0.3, // from 0 to 1
     animDuration: 800, // ms
-    shearFactor: 0.7 // from 0 to 1
+    shearFactor: 0.8 // from 0 to 1
   };
 
   slides = [];
 
-  ellipseLength = 2 * Math.PI;
+  ellipse = 2 * Math.PI;
+
+  ellipseLength = 0;
+
+  ellipseLengthKoef = 0;
 
   direction = 1; // slide direction
 
@@ -109,6 +125,7 @@ class EllipseGallery {
   nextSlide(e) {
     e && e.preventDefault();
     if (!this.isAnimationActive) {
+      this.prevIndex = this.currentIndex;
       if (this.currentIndex < this.slides.length -1) {
         this.currentIndex++;
       } else {
@@ -117,12 +134,14 @@ class EllipseGallery {
 
       this.direction = 1;
       this.setSlidesPosition(true);
+      this.makeCallback('beforeNextSlide', this.currentIndex, this.prevIndex);
     }
   }
 
   prevSlide(e) {
     e && e.preventDefault();
     if (!this.isAnimationActive) {
+      this.prevIndex = this.currentIndex;
       if (this.currentIndex > 0) {
         this.currentIndex--;
       } else {
@@ -131,6 +150,7 @@ class EllipseGallery {
 
       this.direction = -1;
       this.setSlidesPosition(true);
+      this.makeCallback('beforePrevSlide', this.currentIndex, this.prevIndex);
     }
   }
 
@@ -144,10 +164,12 @@ class EllipseGallery {
 
   goToSlide(num) {
     if (num !== null && num !== this.currentIndex) {
+      this.prevIndex = this.currentIndex;
       num = Math.max(Math.min(num, this.slides.length - 1), 0);
       this.currentIndex = num;
       this.direction = 1;
       this.setSlidesPosition(true);
+      this.makeCallback('beforeGoToSlide', this.currentIndex, this.prevIndex);
     }
   }
 
@@ -159,17 +181,22 @@ class EllipseGallery {
 
   defineSlideVisibility() {
     const slidesIndexArr = this.getSlidesIndexByNum(this.currentIndex);
-    const step = this.ellipseLength / this.options.slidesToShow;
-    const diff = this.ellipseLength - step * (this.options.slidesToShow - 1) * this.options.shearFactor;
+    const step = this.ellipse / this.options.slidesToShow;
+    const diff = this.ellipse - step * (this.options.slidesToShow - 1) * this.options.shearFactor;
     const hiddenPosition = (this.options.slidesToShow * step) - diff / 2;
 
     for (let i = 0; i < this.slides.length; i++) {
       const slide = this.slides[i];
-      const position = slidesIndexArr.indexOf(i);
+      const arrayIndex = slidesIndexArr.indexOf(i);
+      let currPosition = step * arrayIndex * this.options.shearFactor;
+
+      if (arrayIndex !== -1 && arrayIndex !== 0 && arrayIndex !== slidesIndexArr.length - 1) {
+        currPosition += this.ellipseLengthKoef * (slidesIndexArr.length - 1 - arrayIndex) * slide.width * (1 - this.options.lastSlideScale) / 5;
+      }
 
       slide.prevPosition = slide.currentPosition;
-      slide.currentPosition = position !== -1 ? step * position * this.options.shearFactor : hiddenPosition;
-      slide.active = position !== -1;
+      slide.currentPosition = arrayIndex !== -1 ? currPosition : hiddenPosition;
+      slide.active = arrayIndex !== -1;
 
       if (typeof slide.prevPosition === 'undefined') {
         slide.prevPosition = slide.currentPosition;
@@ -209,7 +236,7 @@ class EllipseGallery {
     let diff = slideItem.currentPosition - slideItem.prevPosition;
 
     if (diff * this.direction > 0) {
-      diff = (-this.ellipseLength + Math.abs(diff)) * this.direction;
+      diff = (-this.ellipse + Math.abs(diff)) * this.direction;
     }
 
     const value = Math.PI - slideItem.prevPosition - diff * progress;
@@ -229,13 +256,13 @@ class EllipseGallery {
 
     for (let i = 0; i < this.slides.length; i++) {
       const item = this.slides[i];
-      item.params = this.getSlideParams(item);
 
       if (shouldAnimate) {
         if (item.currentPosition !== item.prevPosition) {
           waitArray.push(this.animate(item));
         }
       } else {
+        item.params = this.getSlideParams(item);
         this.updateSlidePosition(item.slide, item.params);
       }
     }
@@ -244,6 +271,7 @@ class EllipseGallery {
       this.isAnimationActive = true;
       Promise.all(waitArray).then(() => {
         this.isAnimationActive = false;
+        this.makeCallback('slideEnd', this);
       });
     }
   }
@@ -257,6 +285,8 @@ class EllipseGallery {
   updateParams() {
     this.galleryWidth = this.gallery.clientWidth;
     this.galleryHeight = this.galleryWidth * this.options.ellipseRatio;
+    this.ellipseLength = Math.PI * (this.galleryWidth + this.galleryHeight) / 2;
+    this.ellipseLengthKoef = this.ellipse / this.ellipseLength;
     for (const item of this.slides) {
       Object.assign(item, this.getSlideSize(item.slide));
     }
@@ -267,14 +297,17 @@ class EllipseGallery {
   }
 
   animate(item) {
+    item.params = this.getSlideParams(item);
     const prevScale = item.slide.getBoundingClientRect().width / item.width;
     const scaleDiff = prevScale - item.params.scale;
 
     return this.animation({
       duration: this.options.animDuration,
       draw: (progress) => {
-        const { left, top } = this.getSlideParams(item, progress);
+        item.params = this.getSlideParams(item, progress);
+        const { left, top } = item.params;
         const scale = prevScale - scaleDiff * progress;
+        item.params.scale = scale;
         this.updateSlidePosition(item.slide, { left, top, scale });
       }
     });
@@ -301,6 +334,13 @@ class EllipseGallery {
 
       requestAnimationFrame(animate);
     });
+  }
+
+  makeCallback(name, ...arg) {
+    if (typeof this.options[name] === 'function') {
+      const args = Array.prototype.slice.call(arg);
+      this.options[name].apply(this, args);
+    }
   }
 
   destroy() {
