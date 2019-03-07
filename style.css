@@ -1,0 +1,44 @@
+body {
+	margin: 0;
+}
+
+.gallary-section {
+	max-width: 960px;
+	margin: 0 auto;
+	display: flex;
+	padding-top: 150px;
+}
+
+.description-gallery,
+.ellipse-gallery {
+	width: 50%;
+}
+
+.ellipse-gallery {
+	height: 300px;
+	position: relative;
+}
+
+.ellipse-gallery .slide {
+	width: 100px;
+	height: 100px;
+	background: #f00;
+	position: absolute;
+	left: 0;
+	top: 0;
+	color: #fff;
+	font-size: 50px;
+	border-radius: 50%;
+}
+
+.ellipse-gallery .slide:nth-child(4n+2) {
+	background: #000;
+}
+
+.ellipse-gallery .slide:nth-child(4n+3) {
+	background: green;
+}
+
+.ellipse-gallery .slide:nth-child(4n+4) {
+	background: blue;
+}
