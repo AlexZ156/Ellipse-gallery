@@ -166,11 +166,23 @@ class EllipseGallery {
     if (num !== null && num !== this.currentIndex) {
       this.prevIndex = this.currentIndex;
       num = Math.max(Math.min(num, this.slides.length - 1), 0);
+      this.direction = this.getDirectionByIndex(num);
       this.currentIndex = num;
-      this.direction = 1;
       this.setSlidesPosition(true);
       this.makeCallback('beforeGoToSlide', this.currentIndex, this.prevIndex);
     }
+  }
+
+  getDirectionByIndex(i) {
+    let arr = this.slides.map((item, index) => index);
+    const leftArr = arr.slice();
+    const rightArr = arr.slice().reverse();
+    arr = leftArr.concat(arr).concat(rightArr);
+    const leftIndex = arr.indexOf(i);
+    const middleIndex = arr.indexOf(this.currentIndex, leftIndex);
+    const rightIndex = arr.indexOf(i, middleIndex)
+
+    return middleIndex - leftIndex > rightIndex - middleIndex ? 1 : -1;
   }
 
   getSlideIndex(targetSlide) {
